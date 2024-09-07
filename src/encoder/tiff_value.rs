@@ -1,5 +1,5 @@
 use std::{borrow::Cow, io::Write, slice::from_ref};
-
+use std::io::Seek;
 use crate::{bytecast, tags::Type, TiffError, TiffFormatError, TiffResult};
 
 use super::writer::TiffWriter;
@@ -20,7 +20,7 @@ pub trait TiffValue {
     /// Write this value to a TiffWriter.
     /// While the default implementation will work in all cases, it may require unnecessary allocations.
     /// The written bytes of any custom implementation MUST be the same as yielded by `self.data()`.
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         writer.write_bytes(&self.data())?;
         Ok(())
     }
@@ -166,7 +166,7 @@ impl TiffValue for u8 {
         1
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         writer.write_u8(*self)?;
         Ok(())
     }
@@ -184,7 +184,7 @@ impl TiffValue for i8 {
         1
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         writer.write_i8(*self)?;
         Ok(())
     }
@@ -202,7 +202,7 @@ impl TiffValue for u16 {
         1
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         writer.write_u16(*self)?;
         Ok(())
     }
@@ -220,7 +220,7 @@ impl TiffValue for i16 {
         1
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         writer.write_i16(*self)?;
         Ok(())
     }
@@ -238,7 +238,7 @@ impl TiffValue for u32 {
         1
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         writer.write_u32(*self)?;
         Ok(())
     }
@@ -256,7 +256,7 @@ impl TiffValue for i32 {
         1
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         writer.write_i32(*self)?;
         Ok(())
     }
@@ -274,7 +274,7 @@ impl TiffValue for u64 {
         1
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         writer.write_u64(*self)?;
         Ok(())
     }
@@ -292,7 +292,7 @@ impl TiffValue for i64 {
         1
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         writer.write_i64(*self)?;
         Ok(())
     }
@@ -310,7 +310,7 @@ impl TiffValue for f32 {
         1
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         writer.write_f32(*self)?;
         Ok(())
     }
@@ -328,7 +328,7 @@ impl TiffValue for f64 {
         1
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         writer.write_f64(*self)?;
         Ok(())
     }
@@ -346,7 +346,7 @@ impl TiffValue for Ifd {
         1
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         writer.write_u32(self.0)?;
         Ok(())
     }
@@ -364,7 +364,7 @@ impl TiffValue for Ifd8 {
         1
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         writer.write_u64(self.0)?;
         Ok(())
     }
@@ -382,7 +382,7 @@ impl TiffValue for Rational {
         1
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         writer.write_u32(self.n)?;
         writer.write_u32(self.d)?;
         Ok(())
@@ -405,7 +405,7 @@ impl TiffValue for SRational {
         1
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         writer.write_i32(self.n)?;
         writer.write_i32(self.d)?;
         Ok(())
@@ -428,7 +428,7 @@ impl TiffValue for str {
         self.len() + 1
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         if self.is_ascii() && !self.bytes().any(|b| b == 0) {
             writer.write_bytes(self.as_bytes())?;
             writer.write_u8(0)?;
@@ -458,7 +458,7 @@ impl<'a, T: TiffValue + ?Sized> TiffValue for &'a T {
         (*self).count()
     }
 
-    fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
         (*self).write(writer)
     }
 
@@ -477,7 +477,7 @@ macro_rules! impl_tiff_value_for_contiguous_sequence {
                 self.len()
             }
 
-            fn write<W: Write>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
+            fn write<W: Write + Seek>(&self, writer: &mut TiffWriter<W>) -> TiffResult<()> {
                 for x in self {
                     x.write(writer)?;
                 }

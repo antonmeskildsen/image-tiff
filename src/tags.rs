@@ -128,6 +128,11 @@ pub enum Tag(u16) unknown("A private or extension tag") {
     GeoDoubleParamsTag = 34736, // (SPOT)
     GeoAsciiParamsTag = 34737, // (SPOT)
     GdalNodata = 42113, // Contains areas with missing data
+
+    // Document Storage and Retrieval
+    DocumentName = 269,
+    PageName = 285,
+    PageNumber = 297,
 }
 }
 

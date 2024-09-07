@@ -1,21 +1,23 @@
 use crate::tags::CompressionMethod;
-use std::io::{self, Write};
+use std::io::{self, Seek, Write};
 
 mod deflate;
 mod lzw;
 mod packbits;
 mod uncompressed;
+mod jpeg;
 
 pub use self::deflate::{Deflate, DeflateLevel};
 pub use self::lzw::Lzw;
 pub use self::packbits::Packbits;
 pub use self::uncompressed::Uncompressed;
+pub use self::jpeg::Jpeg;
 
 /// An algorithm used for compression
 pub trait CompressionAlgorithm {
     /// The algorithm writes data directly into the writer.
     /// It returns the total number of bytes written.
-    fn write_to<W: Write>(&mut self, writer: &mut W, bytes: &[u8]) -> Result<u64, io::Error>;
+    fn write_to<W: Write + Seek>(&mut self, writer: &mut W, bytes: &[u8]) -> Result<u64, io::Error>;
 }
 
 /// An algorithm used for compression with associated enums and optional configurations.
@@ -33,6 +35,7 @@ pub enum Compressor {
     Lzw(Lzw),
     Deflate(Deflate),
     Packbits(Packbits),
+    Jpeg(Jpeg)
 }
 
 impl Default for Compressor {
@@ -43,12 +46,13 @@ impl Default for Compressor {
 }
 
 impl CompressionAlgorithm for Compressor {
-    fn write_to<W: Write>(&mut self, writer: &mut W, bytes: &[u8]) -> Result<u64, io::Error> {
+    fn write_to<W: Write + Seek>(&mut self, writer: &mut W, bytes: &[u8]) -> Result<u64, io::Error> {
         match self {
             Compressor::Uncompressed(algorithm) => algorithm.write_to(writer, bytes),
             Compressor::Lzw(algorithm) => algorithm.write_to(writer, bytes),
             Compressor::Deflate(algorithm) => algorithm.write_to(writer, bytes),
             Compressor::Packbits(algorithm) => algorithm.write_to(writer, bytes),
+            Compressor::Jpeg(algorithm) => algorithm.write_to(writer, bytes),
         }
     }
 }
