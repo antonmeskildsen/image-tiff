@@ -47,7 +47,7 @@ pub struct TiffWriter<W> {
     compressor: Compressor,
 }
 
-impl<W: Write> TiffWriter<W> {
+impl<W: Write + Seek> TiffWriter<W> {
     pub fn new(writer: W) -> Self {
         Self {
             writer,

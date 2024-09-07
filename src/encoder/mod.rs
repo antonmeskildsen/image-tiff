@@ -8,7 +8,7 @@ use std::{
     mem,
     num::TryFromIntError,
 };
-
+use std::io::Cursor;
 use crate::{
     error::{TiffResult, UsageError},
     tags::{CompressionMethod, ResolutionUnit, SampleFormat, Tag},
@@ -216,7 +216,7 @@ impl<'a, W: 'a + Write + Seek, K: TiffKind> DirectoryEncoder<'a, W, K> {
 
     /// Write a single ifd tag.
     pub fn write_tag<T: TiffValue>(&mut self, tag: Tag, value: T) -> TiffResult<()> {
-        let mut bytes = Vec::with_capacity(value.bytes());
+        let mut bytes = Cursor::new(Vec::with_capacity(value.bytes()));
         {
             let mut writer = TiffWriter::new(&mut bytes);
             value.write(&mut writer)?;
@@ -227,7 +227,7 @@ impl<'a, W: 'a + Write + Seek, K: TiffKind> DirectoryEncoder<'a, W, K> {
             DirectoryEntry {
                 data_type: <T>::FIELD_TYPE.to_u16(),
                 count: value.count().try_into()?,
-                data: bytes,
+                data: bytes.into_inner(),
             },
         );
 
@@ -247,7 +247,8 @@ impl<'a, W: 'a + Write + Seek, K: TiffKind> DirectoryEncoder<'a, W, K> {
                 let offset = self.writer.offset();
                 self.writer.write_bytes(bytes)?;
                 *bytes = vec![0; data_bytes];
-                let mut writer = TiffWriter::new(bytes as &mut [u8]);
+                let cs = Cursor::new(bytes as &mut [u8]);
+                let mut writer = TiffWriter::new(cs);
                 K::write_offset(&mut writer, offset)?;
             } else {
                 while bytes.len() < data_bytes {
@@ -631,7 +632,7 @@ pub trait TiffKind {
     type OffsetArrayType: ?Sized + TiffValue;
 
     /// Write the (Big)Tiff header.
-    fn write_header<W: Write>(writer: &mut TiffWriter<W>) -> TiffResult<()>;
+    fn write_header<W: Write + Seek>(writer: &mut TiffWriter<W>) -> TiffResult<()>;
 
     /// Convert a file offset to `Self::OffsetType`.
     ///
@@ -641,13 +642,13 @@ pub trait TiffKind {
     /// Write an offset value to the given writer.
     ///
     /// Like `convert_offset`, this errors if `offset > u32::MAX` for normal Tiff.
-    fn write_offset<W: Write>(writer: &mut TiffWriter<W>, offset: u64) -> TiffResult<()>;
+    fn write_offset<W: Write + Seek>(writer: &mut TiffWriter<W>, offset: u64) -> TiffResult<()>;
 
     /// Write the IFD entry count field with the given `count` value.
     ///
     /// The entry count field is an `u16` for normal Tiff and `u64` for BigTiff. Errors
     /// if the given `usize` is larger than the representable values.
-    fn write_entry_count<W: Write>(writer: &mut TiffWriter<W>, count: usize) -> TiffResult<()>;
+    fn write_entry_count<W: Write + Seek>(writer: &mut TiffWriter<W>, count: usize) -> TiffResult<()>;
 
     /// Internal helper method for satisfying Rust's type checker.
     ///
@@ -669,7 +670,7 @@ impl TiffKind for TiffKindStandard {
     type OffsetType = u32;
     type OffsetArrayType = [u32];
 
-    fn write_header<W: Write>(writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write_header<W: Write + Seek>(writer: &mut TiffWriter<W>) -> TiffResult<()> {
         write_tiff_header(writer)?;
         // blank the IFD offset location
         writer.write_u32(0)?;
@@ -681,12 +682,12 @@ impl TiffKind for TiffKindStandard {
         Ok(Self::OffsetType::try_from(offset)?)
     }
 
-    fn write_offset<W: Write>(writer: &mut TiffWriter<W>, offset: u64) -> TiffResult<()> {
+    fn write_offset<W: Write + Seek>(writer: &mut TiffWriter<W>, offset: u64) -> TiffResult<()> {
         writer.write_u32(u32::try_from(offset)?)?;
         Ok(())
     }
 
-    fn write_entry_count<W: Write>(writer: &mut TiffWriter<W>, count: usize) -> TiffResult<()> {
+    fn write_entry_count<W: Write + Seek>(writer: &mut TiffWriter<W>, count: usize) -> TiffResult<()> {
         writer.write_u16(u16::try_from(count)?)?;
 
         Ok(())
@@ -704,7 +705,7 @@ impl TiffKind for TiffKindBig {
     type OffsetType = u64;
     type OffsetArrayType = [u64];
 
-    fn write_header<W: Write>(writer: &mut TiffWriter<W>) -> TiffResult<()> {
+    fn write_header<W: Write + Seek>(writer: &mut TiffWriter<W>) -> TiffResult<()> {
         write_bigtiff_header(writer)?;
         // blank the IFD offset location
         writer.write_u64(0)?;
@@ -716,12 +717,12 @@ impl TiffKind for TiffKindBig {
         Ok(offset)
     }
 
-    fn write_offset<W: Write>(writer: &mut TiffWriter<W>, offset: u64) -> TiffResult<()> {
+    fn write_offset<W: Write + Seek>(writer: &mut TiffWriter<W>, offset: u64) -> TiffResult<()> {
         writer.write_u64(offset)?;
         Ok(())
     }
 
-    fn write_entry_count<W: Write>(writer: &mut TiffWriter<W>, count: usize) -> TiffResult<()> {
+    fn write_entry_count<W: Write + Seek>(writer: &mut TiffWriter<W>, count: usize) -> TiffResult<()> {
         writer.write_u64(u64::try_from(count)?)?;
         Ok(())
     }
